@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Autonomous Multi-Tier Disruption Response Agent — MVP</title>
+<style>
+  :root{
+    --bg:#0B1220; --panel:#121B2E; --panel2:#17233A; --line:#24334F;
+    --text:#E7ECF4; --dim:#8FA0BC; --amber:#E8A33D; --teal:#4FBFA8; --red:#E2604F;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:30px 20px 70px;}
+  .wrap{max-width:960px;margin:0 auto;}
+  .eyebrow{color:var(--amber);font-size:12.5px;letter-spacing:0.08em;font-weight:650;}
+  h1{font-size:27px;margin:6px 0 6px;font-weight:660;letter-spacing:-0.01em;}
+  .sub{color:var(--dim);font-size:14.5px;max-width:680px;line-height:1.55;}
+
+  /* Architecture strip */
+  .arch{
+    display:flex; gap:0; margin:26px 0 8px; overflow-x:auto; padding-bottom:6px;
+  }
+  .archnode{
+    flex:1 0 150px; background:var(--panel); border:1px solid var(--line); border-radius:9px;
+    padding:12px 14px; margin-right:10px; position:relative; min-width:150px;
+  }
+  .archnode:last-child{margin-right:0;}
+  .archnode .lbl{font-size:11px; color:var(--dim); letter-spacing:.04em; margin-bottom:4px;}
+  .archnode .svc{font-size:13px; font-weight:650;}
+  .archnode .svc.sap{color:#5FC9E8;}
+  .archnode .svc.aws{color:var(--amber);}
+  .arrow{align-self:center; color:var(--dim); font-size:16px; padding:0 4px; flex:0 0 auto;}
+
+  .picker{display:flex; gap:10px; flex-wrap:wrap; margin:24px 0 6px;}
+  .scenbtn{
+    background:var(--panel); border:1px solid var(--line); color:var(--text);
+    border-radius:9px; padding:12px 15px; cursor:pointer; text-align:left; flex:1 1 260px;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .scenbtn:hover{border-color:var(--amber);}
+  .scenbtn.selected{border-color:var(--amber); background:var(--panel2);}
+  .scenbtn .t{font-size:13.5px; font-weight:650; margin-bottom:3px;}
+  .scenbtn .d{font-size:12.5px; color:var(--dim); line-height:1.4;}
+
+  .runrow{margin:20px 0 4px; display:flex; align-items:center;}
+  .runbtn{background:var(--amber); color:#20150A; border:none; border-radius:8px; padding:12px 22px; font-size:14.5px; font-weight:660; cursor:pointer;}
+  .runbtn:hover{filter:brightness(1.08);}
+  .runbtn:disabled{background:var(--line); color:var(--dim); cursor:not-allowed;}
+  .resetbtn{background:transparent; color:var(--dim); border:1px solid var(--line); border-radius:8px; padding:12px 16px; font-size:13.5px; cursor:pointer; margin-left:10px;}
+  .resetbtn:hover{color:var(--text); border-color:var(--dim);}
+
+  .trace{margin-top:22px;}
+  .step{display:flex; gap:14px; opacity:0; transform:translateY(6px); animation:in .35s ease forwards; border-left:2px solid var(--line); padding:2px 0 20px 16px; position:relative;}
+  .step::before{content:'';position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--panel2);border:2px solid var(--dim);}
+  .step.done::before{border-color:var(--teal); background:var(--teal);}
+  .step.flag::before{border-color:var(--amber); background:var(--amber);}
+  @keyframes in{to{opacity:1; transform:translateY(0);}}
+  .stepphase{font-size:11px; letter-spacing:.06em; color:var(--dim); font-family:var(--mono); margin-bottom:3px;}
+  .steptitle{font-size:15px; font-weight:620; margin-bottom:4px;}
+  .stepdetail{font-size:13.5px; color:var(--dim); line-height:1.55;}
+  .tag{display:inline-block; font-family:var(--mono); font-size:11.5px; color:var(--teal); background:rgba(79,191,168,.1); border:1px solid rgba(79,191,168,.3); border-radius:5px; padding:2px 7px; margin-top:7px; margin-right:6px;}
+  .tag.sys{color:var(--amber); background:rgba(232,163,61,.1); border-color:rgba(232,163,61,.3);}
+
+  .scenariotable{width:100%; border-collapse:collapse; margin-top:8px; font-size:13px;}
+  .scenariotable th,.scenariotable td{border:1px solid var(--line); padding:8px 10px; text-align:left;}
+  .scenariotable th{background:var(--panel2); color:var(--dim); font-weight:600; font-size:11.5px; letter-spacing:.03em;}
+  .scenariotable td.best{color:var(--teal); font-weight:650;}
+
+  .outcome{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:20px 22px; margin-top:8px;}
+  .outcome h4{margin:0 0 12px; font-size:15px; font-weight:660; color:var(--amber);}
+  .outcome .row{display:flex; justify-content:space-between; gap:16px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px;}
+  .outcome .row:last-child{border-bottom:none;}
+  .outcome .row .k{color:var(--dim); flex:0 0 auto;}
+  .outcome .row .v{font-family:var(--mono); text-align:right;}
+  .approve{margin-top:14px; padding:11px 14px; background:rgba(226,96,79,.08); border:1px solid rgba(226,96,79,.35); border-radius:8px; color:#F2A99C; font-size:13px; line-height:1.5;}
+  .approvebtns{margin-top:10px; display:flex; gap:8px;}
+  .approvebtns button{border:none; border-radius:6px; padding:8px 14px; font-size:13px; font-weight:650; cursor:pointer;}
+  .approvebtns .ok{background:var(--teal); color:#082421;}
+  .approvebtns .no{background:transparent; border:1px solid var(--line); color:var(--dim);}
+  .posted{margin-top:10px; font-size:13px; color:var(--teal);}
+
+  footer{margin-top:34px; color:var(--dim); font-size:12.5px; line-height:1.6; border-top:1px solid var(--line); padding-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">AGENTIC AI · MVP</div>
+  <h1>Autonomous Multi-Tier Disruption Response Agent</h1>
+  <div class="sub">Pick a disruption event below and run the agent. It will resolve the event to your supplier network, simulate resourcing options, and act — holding for approval when the decision exceeds its policy threshold. Data shown is synthetic, standing in for live SAP/AWS integration.</div>
+
+  <div class="arch">
+    <div class="archnode"><div class="lbl">SENSE</div><div class="svc aws">Amazon Bedrock</div></div>
+    <div class="arrow">→</div>
+    <div class="archnode"><div class="lbl">RESOLVE</div><div class="svc sap">SAP Business Network</div></div>
+    <div class="arrow">→</div>
+    <div class="archnode"><div class="lbl">SIMULATE</div><div class="svc sap">SAP IBP</div></div>
+    <div class="arrow">→</div>
+    <div class="archnode"><div class="lbl">ACT</div><div class="svc sap">SAP Ariba</div></div>
+    <div class="arrow">→</div>
+    <div class="archnode"><div class="lbl">AUDIT</div><div class="svc aws">Amazon DynamoDB</div></div>
+  </div>
+
+  <div class="picker" id="picker"></div>
+
+  <div class="runrow">
+    <button class="runbtn" id="runBtn">Run agent</button>
+    <button class="resetbtn" id="resetBtn">Reset</button>
+  </div>
+
+  <div class="trace" id="trace"></div>
+
+  <footer>
+    MVP scope: the reasoning trace, entity-resolution logic, and scenario simulation shown here reproduce the agent's actual decision behavior. In production, each "Retrieve" step calls live SAP APIs (Business Network, S/4HANA, IBP) and each "Act" step calls the SAP Ariba API; approval routing uses your existing approval workflow (e.g. SAP Workflow / Teams / email).
+  </footer>
+</div>
+
+<script>
+const SCENARIOS = [
+  {
+    id: 'flood',
+    title: 'Regional flooding — Rayong, Thailand',
+    desc: 'Industrial estates affected; road access disrupted.',
+    entity: 'Resin supplier "Thai Polymer Industries" (tier-2), feeding Injection-Molded Housing Co. (tier-1)',
+    skus: 'SKU-4471, SKU-4483',
+    buffer: '9 days',
+    leadtime: '18 days (affected route)',
+    scenarios: [
+      { name:'A — Air-freight expedite (same supplier)', time:'6 days', cost:'+$41,000', note:'Fast but assumes supplier resumes operations quickly' },
+      { name:'B — Shift 40% volume to Malaysia (alt. supplier)', time:'11 days', cost:'+$9,000', note:'Slower but well within the 9-day buffer; approved backup supplier', best:true },
+      { name:'C — Absorb risk, no action', time:'—', cost:'$0 upfront', note:'Risk: stockout in ~14 days if disruption exceeds 5 days' },
+    ],
+    threshold: 8000,
+    recSpend: 9000,
+    recommendation: 'B — Shift 40% volume to Malaysia',
+  },
+  {
+    id: 'strike',
+    title: 'Port workers strike — Rotterdam',
+    desc: 'Indefinite strike announced; 40% of container throughput affected.',
+    entity: 'Freight lane for "Nordic Components AB" (tier-1), routed through Rotterdam',
+    skus: 'SKU-2201',
+    buffer: '4 days',
+    leadtime: '9 days (via Rotterdam)',
+    scenarios: [
+      { name:'A — Reroute via Antwerp', time:'+2 days vs. plan', cost:'+$6,200', note:'Small delay, modest cost; capacity confirmed available', best:true },
+      { name:'B — Air-freight partial volume', time:'+0 days', cost:'+$28,500', note:'No schedule impact but costly for a 4-day buffer gap' },
+      { name:'C — Absorb risk, no action', time:'—', cost:'$0 upfront', note:'Risk: stockout in ~4 days, strike duration unknown' },
+    ],
+    threshold: 8000,
+    recSpend: 6200,
+    recommendation: 'A — Reroute via Antwerp',
+  },
+  {
+    id: 'fire',
+    title: 'Factory fire — sub-supplier, Chongqing',
+    desc: 'Fire reported at a specialty-chemical facility; extent of damage unclear.',
+    entity: 'Specialty additive supplier (tier-3), feeding "Coatings Solutions Ltd." (tier-1)',
+    skus: 'SKU-7790, SKU-7791, SKU-7803',
+    buffer: '21 days',
+    leadtime: 'Unknown — facility status unconfirmed',
+    scenarios: [
+      { name:'A — Qualify backup supplier now (parallel path)', time:'15–20 days to qualify', cost:'+$14,000 (qualification)', note:'Long buffer allows proactive qualification instead of reactive scramble', best:true },
+      { name:'B — Wait for supplier confirmation', time:'Unknown', cost:'$0 upfront', note:'Buffer is long, but risk compounds if facility is a total loss' },
+    ],
+    threshold: 8000,
+    recSpend: 14000,
+    recommendation: 'A — Qualify backup supplier in parallel',
+  },
+];
+
+let selected = SCENARIOS[0];
+
+function renderPicker(){
+  const p = document.getElementById('picker');
+  p.innerHTML = '';
+  SCENARIOS.forEach(s => {
+    const b = document.createElement('div');
+    b.className = 'scenbtn' + (s.id === selected.id ? ' selected' : '');
+    b.innerHTML = `<div class="t">${s.title}</div><div class="d">${s.desc}</div>`;
+    b.addEventListener('click', () => { selected = s; renderPicker(); resetTrace(); });
+    p.appendChild(b);
+  });
+}
+
+function resetTrace(){
+  document.getElementById('trace').innerHTML = '';
+  const b = document.getElementById('runBtn');
+  b.disabled = false; b.textContent = 'Run agent';
+}
+
+function scenarioTableHTML(s){
+  let rows = s.scenarios.map(sc => `
+    <tr>
+      <td class="${sc.best ? 'best':''}">${sc.name}${sc.best ? ' ★':''}</td>
+      <td>${sc.time}</td>
+      <td>${sc.cost}</td>
+      <td>${sc.note}</td>
+    </tr>`).join('');
+  return `<table class="scenariotable">
+    <tr><th>Option</th><th>Time impact</th><th>Cost impact</th><th>Notes</th></tr>
+    ${rows}
+  </table>`;
+}
+
+function buildSteps(s){
+  return [
+    { phase:'SENSE', title:'Interpret external signal', detail:`Classifies the reported event as a potential supply disruption and extracts the relevant entities and severity. Event: "${s.title} — ${s.desc}"`, tags:[{label:'Bedrock · reasoning'}] },
+    { phase:'RETRIEVE', title:'Resolve affected supplier & SKUs', detail:`Cross-references the event location against the multi-tier supplier graph. Identifies: ${s.entity}.`, tags:[{label:'SAP Business Network', sys:true},{label:'SAP S/4HANA supplier master', sys:true}] },
+    { phase:'RETRIEVE', title:'Check exposure', detail:`Affected SKU(s): ${s.skus}. Current safety stock buffer: ${s.buffer}. Lead time on the affected path: ${s.leadtime}.`, tags:[{label:'SAP IBP', sys:true}] },
+    { phase:'REASON', title:'Simulate resourcing options', detail:'Runs each option through IBP what-if simulation, comparing time and cost impact against the current buffer.', custom: scenarioTableHTML(s), tags:[{label:'SAP IBP what-if', sys:true}] },
+    { phase:'REASON', title:'Recommend', detail:`Recommends <strong>${s.recommendation}</strong> as the best trade-off of cost, time, and confidence given the current buffer.` },
+    { phase:'ACT', title:'Draft corrective action', detail:'Auto-drafts the sourcing/logistics change in SAP Ariba / SAP TM and prepares the audit record.', status: s.recSpend > s.threshold ? 'flag' : 'done', tags:[{label:'SAP Ariba draft', sys:true}] },
+  ];
+}
+
+function runTrace(){
+  const s = selected;
+  const steps = buildSteps(s);
+  const container = document.getElementById('trace');
+  const btn = document.getElementById('runBtn');
+  container.innerHTML = '';
+  btn.disabled = true;
+  btn.textContent = 'Agent running…';
+
+  steps.forEach((st, i) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'step ' + (st.status || 'done');
+      el.innerHTML = `
+        <div style="flex:1">
+          <div class="stepphase">${st.phase}</div>
+          <div class="steptitle">${st.title}</div>
+          <div class="stepdetail">${st.detail}</div>
+          ${st.custom || ''}
+          ${(st.tags||[]).map(t => `<span class="tag ${t.sys?'sys':''}">${t.label}</span>`).join('')}
+        </div>`;
+      container.appendChild(el);
+
+      if(i === steps.length - 1){
+        setTimeout(() => showOutcome(s, container, btn), 550);
+      }
+    }, i * 950);
+  });
+}
+
+function showOutcome(s, container, btn){
+  const needsApproval = s.recSpend > s.threshold;
+  const out = document.createElement('div');
+  out.className = 'outcome';
+  out.innerHTML = `
+    <h4>${needsApproval ? 'Recommended action — awaiting approval' : 'Action executed — within policy'}</h4>
+    <div class="row"><div class="k">Affected SKUs</div><div class="v">${s.skus}</div></div>
+    <div class="row"><div class="k">Safety stock buffer</div><div class="v">${s.buffer}</div></div>
+    <div class="row"><div class="k">Recommended option</div><div class="v">${s.recommendation}</div></div>
+    <div class="row"><div class="k">Estimated cost impact</div><div class="v">$${s.recSpend.toLocaleString()}</div></div>
+    <div class="row"><div class="k">Approval threshold</div><div class="v">$${s.threshold.toLocaleString()}</div></div>
+    ${needsApproval
+      ? `<div class="approve">Estimated spend ($${s.recSpend.toLocaleString()}) exceeds the $${s.threshold.toLocaleString()} autonomous-execution threshold — routed to the Supply Chain Manager for one-click approval, with the full evidence chain and every simulated option attached.</div>
+         <div class="approvebtns">
+           <button class="ok" id="approveBtn">Approve &amp; execute</button>
+           <button class="no" id="rejectBtn">Send back for revision</button>
+         </div>
+         <div class="posted" id="postedMsg" style="display:none;"></div>`
+      : `<div class="approve" style="background:rgba(79,191,168,.08); border-color:rgba(79,191,168,.35); color:#BFEFE3;">Estimated spend ($${s.recSpend.toLocaleString()}) is within the $${s.threshold.toLocaleString()} autonomous-execution threshold — the agent proceeded without waiting for approval. Full evidence chain logged for audit.</div>`
+    }
+  `;
+  container.appendChild(out);
+  btn.disabled = false;
+  btn.textContent = 'Run agent again';
+
+  if (needsApproval) {
+    const approveBtn = out.querySelector('#approveBtn');
+    const rejectBtn = out.querySelector('#rejectBtn');
+    const posted = out.querySelector('#postedMsg');
+    approveBtn.addEventListener('click', () => {
+      posted.style.display = 'block';
+      posted.textContent = '✓ Approved — RFQ/PO amendment released to SAP Ariba, and the disruption case is closed with the full reasoning trace attached.';
+      approveBtn.disabled = true; rejectBtn.disabled = true;
+    });
+    rejectBtn.addEventListener('click', () => {
+      posted.style.display = 'block';
+      posted.style.color = 'var(--dim)';
+      posted.textContent = 'Sent back — the agent will re-run scenario simulation with your added constraints on next input.';
+      approveBtn.disabled = true; rejectBtn.disabled = true;
+    });
+  }
+}
+
+document.getElementById('runBtn').addEventListener('click', runTrace);
+document.getElementById('resetBtn').addEventListener('click', resetTrace);
+renderPicker();
+</script>
+</body>
+</html>
